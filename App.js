@@ -1,0 +1,88 @@
+Ext.define('CustomApp', {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    items:{ html:'<a href="https://help.rallydev.com/apps/2.0rc3/doc/">App SDK 2.0rc3 Docs</a>'},
+    launch: function() {
+        var rComboBox = Ext.create('Rally.ui.combobox.ReleaseComboBox',{
+   		listeners:{
+   			ready: function(combobox){
+   				this._getData(combobox.getRecord());
+   			},
+   			select: function(combobox){
+   				this._getData(combobox.getRecord());
+   			},
+   			scope: this 
+   		}
+   	});
+   	this.add(rComboBox);
+    },
+    _getData: function(release){
+        var project = this.getContext().getProject();
+        var projectRef = project._ref;
+        this._projectOid = project.ObjectID;
+        console.log(project);
+        var releaseStartDate = release.get('ReleaseStartDate');
+        var releaseDate = release.get('ReleaseDate');
+        var releaseStartDateISO = Rally.util.DateTime.toIsoString(releaseStartDate,true);
+        var releaseDateISO = Rally.util.DateTime.toIsoString(releaseDate,true);
+        console.log('loading iterations that fall within', releaseStartDateISO, ' and ', releaseDateISO);
+        
+   	var myStore = Ext.create('Rally.data.wsapi.Store',{
+   		model: 'Iteration',
+   		autoLoad:true,
+   		fetch: ['Name','StartDate','EndDate','ObjectID', 'Theme'],
+   		filters:[
+   			{
+   			    property : 'StartDate',
+   			    operator : '>=',
+   			    value : releaseStartDateISO
+   			},
+                        {
+                            property : 'EndDate',
+   			    operator : '<=',
+   			    value : releaseDateISO
+                        },
+                        {
+                            property : 'Project',
+                            value: projectRef
+                        }
+   		],
+   		listeners: {
+   			load: function(store,records,success){
+   				console.log("loaded %i records", records.length);
+   				this._updateGrid(myStore);
+   			},
+   			scope:this
+   		}
+   	});
+     },
+     
+     _updateGrid: function(myStore){
+   	if(this._myGrid === undefined){
+   		this._createGrid(myStore);
+   	}
+   	else{
+   		this._myGrid.reconfigure(myStore);
+   	}
+   },
+   
+    _createGrid: function(myStore){
+        var that = this;
+   	this._myGrid = Ext.create('Ext.grid.Panel', {
+            title: 'Iterations that fall within a Release',
+            store: myStore,
+            columns: [
+                {text: 'Name', dataIndex: 'Name', flex: 1,
+                    renderer: function(val, meta, record) {
+                        return '<a href="https://rally1.rallydev.com/#/' + that._projectOid + '/detail/iteration/' + record.get('ObjectID') + '" target="_blank">' + record.get('Name') + '</a>';
+                }
+                },
+                {text: 'StartDate', dataIndex: 'StartDate', flex: 2},
+                {text: 'EndDate', dataIndex: 'EndDate', flex: 2},
+                {text: 'Theme', dataIndex: 'Theme', flex: 2}
+            ],
+            height: 400
+   	});
+   	this.add(this._myGrid);
+   },
+});
